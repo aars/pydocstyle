@@ -60,7 +60,10 @@ class ConventionChecker(object):
                      'Attributes',
                      'Methods']
 
-    def check_source(self, source, filename, ignore_decorators=None):
+    def check_source(self, source, filename, ignore_decorators=None, section_names=None):
+        if section_names:
+            SECTION_NAMES += section_names
+
         module = parse(StringIO(source), filename)
         for definition in module:
             for this_check in self.checks:
@@ -654,7 +657,7 @@ class ConventionChecker(object):
 parse = Parser()
 
 
-def check(filenames, select=None, ignore=None, ignore_decorators=None):
+def check(filenames, select=None, ignore=None, ignore_decorators=None, section_names=None):
     """Generate docstring errors that exist in `filenames` iterable.
 
     By default, the PEP-257 convention is checked. To specifically define the
@@ -700,7 +703,8 @@ def check(filenames, select=None, ignore=None, ignore_decorators=None):
             with tokenize_open(filename) as file:
                 source = file.read()
             for error in ConventionChecker().check_source(source, filename,
-                                                          ignore_decorators):
+                                                          ignore_decorators,
+                                                          section_names):
                 code = getattr(error, 'code', None)
                 if code in checked_codes:
                     yield error

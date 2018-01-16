@@ -224,7 +224,7 @@ def test_config_file(env):
                 pass
         """))
 
-    env.write_config(ignore='D100')
+    env.write_config(ignore='D100', section_names=["Design Specification"])
     out, err, code = env.invoke()
     assert code == 1
     assert 'D100' not in out

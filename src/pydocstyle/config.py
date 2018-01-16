@@ -4,11 +4,8 @@ import copy
 import itertools
 import os
 from collections import Set, namedtuple
-from re import compile as re
-
-
 from configparser import RawConfigParser
-
+from re import compile as re
 
 from .utils import __version__, log
 from .violations import ErrorRegistry, conventions
@@ -33,7 +30,7 @@ class ConfigurationParser(object):
     ------------------
     Responsible for deciding things that are related to the user interface and
     configuration discovery, e.g. verbosity, debug options, etc.
-    All run configurations default to `False` or `None` and are decided only 
+    All run configurations default to `False` or `None` and are decided only
     by CLI.
 
     Check Configurations:
@@ -63,12 +60,13 @@ class ConfigurationParser(object):
 
     CONFIG_FILE_OPTIONS = ('convention', 'select', 'ignore', 'add-select',
                            'add-ignore', 'match', 'match-dir',
-                           'ignore-decorators')
+                           'ignore-decorators', 'section-names')
     BASE_ERROR_SELECTION_OPTIONS = ('ignore', 'select', 'convention')
 
     DEFAULT_MATCH_RE = '(?!test_).*\.py'
     DEFAULT_MATCH_DIR_RE = '[^\.].*'
     DEFAULT_IGNORE_DECORATORS_RE = ''
+    DEFAULT_SECTION_NAMES_RE = ''
     DEFAULT_CONVENTION = conventions.pep257
 
     PROJECT_CONFIG_FILES = (
@@ -149,12 +147,20 @@ class ConfigurationParser(object):
                 ignore_decorators = None
             return ignore_decorators
 
+        def _get_section_names(config):
+            if config.section_names:
+                section_names = re(config.section_names)
+            else:
+                section_names = None
+            return section_names
+
         for name in self._arguments:
             if os.path.isdir(name):
                 for root, dirs, filenames in os.walk(name):
                     config = self._get_config(os.path.abspath(root))
                     match, match_dir = _get_matches(config)
                     ignore_decorators = _get_ignore_decorators(config)
+                    section_names = _get_section_names(config)
 
                     # Skip any dirs that do not match match_dir
                     dirs[:] = [dir for dir in dirs if match_dir(dir)]
@@ -163,26 +169,27 @@ class ConfigurationParser(object):
                         if match(filename):
                             full_path = os.path.join(root, filename)
                             yield (full_path, list(config.checked_codes),
-                                   ignore_decorators)
+                                   ignore_decorators, section_names)
             else:
                 config = self._get_config(os.path.abspath(name))
                 match, _ = _get_matches(config)
                 ignore_decorators = _get_ignore_decorators(config)
+                section_names = _get_section_names(config)
                 if match(name):
-                    yield (name, list(config.checked_codes), ignore_decorators)
+                    yield (name, list(config.checked_codes), ignore_decorators, section_names)
 
     # --------------------------- Private Methods -----------------------------
 
     def _get_config_by_discovery(self, node):
         """Get a configuration for checking `node` by config discovery.
-        
+
         Config discovery happens when no explicit config file is specified. The
         file system is searched for config files starting from the directory
         containing the file being checked, and up until the root directory of
         the project.
-        
+
         See `_get_config` for further details.
-        
+
         """
         path = self._get_node_dir(node)
 
@@ -360,7 +367,7 @@ class ConfigurationParser(object):
         self._set_add_options(error_codes, child_options)
 
         kwargs = dict(checked_codes=error_codes)
-        for key in ('match', 'match_dir', 'ignore_decorators'):
+        for key in ('match', 'match_dir', 'ignore_decorators', 'section_names'):
             kwargs[key] = \
                 getattr(child_options, key) or getattr(parent_config, key)
         return CheckConfiguration(**kwargs)
@@ -392,7 +399,7 @@ class ConfigurationParser(object):
             checked_codes = cls._get_checked_errors(options)
 
         kwargs = dict(checked_codes=checked_codes)
-        for key in ('match', 'match_dir', 'ignore_decorators'):
+        for key in ('match', 'match_dir', 'ignore_decorators', 'section_names'):
             kwargs[key] = getattr(cls, 'DEFAULT_{0}_RE'.format(key.upper())) \
                 if getattr(options, key) is None and use_defaults \
                 else getattr(options, key)
@@ -626,13 +633,18 @@ class ConfigurationParser(object):
                      "regular expression; default is --ignore-decorators='{0}'"
                      " which does not ignore any decorated functions."
                      .format(cls.DEFAULT_IGNORE_DECORATORS_RE)))
+
+        # Custom section names
+        option('--section-names', metavar='<sections>', default=None,
+               help="custom section names to check.")
+
         return parser
 
 
 # Check configuration - used by the ConfigurationParser class.
 CheckConfiguration = namedtuple('CheckConfiguration',
                                 ('checked_codes', 'match', 'match_dir',
-                                 'ignore_decorators'))
+                                 'ignore_decorators', 'section_names'))
 
 
 class IllegalConfiguration(Exception):

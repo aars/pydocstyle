@@ -39,10 +39,11 @@ def run_pydocstyle():
 
     errors = []
     try:
-        for filename, checked_codes, ignore_decorators in \
+        for filename, checked_codes, ignore_decorators, section_names in \
                 conf.get_files_to_check():
             errors.extend(check((filename,), select=checked_codes,
-                                ignore_decorators=ignore_decorators))
+                                ignore_decorators=ignore_decorators,
+                                section_names=section_names))
     except IllegalConfiguration as error:
         # An illegal configuration file was found during file generation.
         log.error(error.args[0])
